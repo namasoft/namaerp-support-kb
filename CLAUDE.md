@@ -37,23 +37,25 @@ English screen or field name. Answer in the language they asked in. Arabic quest
 ```
 docs/
   getting-started/     installation, requirements, nama.properties, 2FA
-  modules/             20 functional modules (accounting, hr, supplychain, pos, ...) — 600 files
+  modules/             20 functional modules (accounting, hr, supplychain, pos, ...) — ~700 files
   platform/            cross-module features: approvals, screen modifier, security,
-                       reports, BI, list views, import/export, entity flows, DMS  — 100 files
-  entity-flows/        generated reference for every entity flow, by module      — 270 files
+                       reports, BI, list views, import/export, entity flows, DMS  — ~155 files
+  entity-flows/        reference for every entity flow, by module (English only) — ~315 files
+                       groovy/ = tested Groovy script examples, one page each
   admin/               troubleshooting, reprocessing (quantities/costs/ledger), DB utils
   integration/         Nama ERP API, attendance machines, invoice retriever, JDBC
-  release-notes/       monthly release notes by year (2016 onwards), English
+  release-notes/       monthly release notes by year (2016 onwards)
   architecture/        application / infrastructure / security architecture
   videos/              video tutorial index
-  ar/                  Arabic mirror of ALL of the above, same filenames
+  ar/                  Arabic mirror of all of the above except entity-flows/, same filenames
 ```
 
 Two things to know:
 
-- **`docs/ar/` is a full translation mirror.** `docs/modules/accounting/accounts.md` and
-  `docs/ar/modules/accounting/accounts.md` are the same page. When you grep, this doubles every
-  hit. Search one side deliberately (see below) instead of drowning in duplicates.
+- **`docs/ar/` is a full translation mirror** (except `entity-flows/`, which is English only).
+  `docs/modules/accounting/accounts.md` and `docs/ar/modules/accounting/accounts.md` are the same
+  page. When you grep, this doubles every hit. Search one side deliberately (see below) instead of
+  drowning in duplicates.
 - **Release notes exist in both languages**, one page per month:
   `docs/release-notes/<year>/nama-erp-<yyyymm>-release-notes.md` and the same path under `docs/ar/`.
   Use them for "when was this feature added / did this change in a recent version" questions.
@@ -137,18 +139,27 @@ search of the prose (the prose deliberately avoids internal names, so `SalesInvo
 appear on the page that explains sales invoices at all):
 
 ```bash
-grep -rl "^entities:.*\bSrvCJobOrder\b" namaerp-docs/docs --include='*.md' --exclude-dir=ar
+grep -rl "^entities:.*\bSrvCJobOrder\b" namaerp-docs/docs --include='*.md' --exclude-dir=ar --exclude-dir=entity-flows
 ```
 
-Two things to know about these keys:
+**Find a screen from its Arabic name** — grep the Arabic `menu:` keys, not the prose (a plain grep
+for a screen word returns dozens of pages that merely mention it):
+
+```bash
+grep -rl "^menu:.*تحويل مخزني" namaerp-docs/docs/ar --include='*.md'
+```
+
+Three things to know about these keys:
 
 - **`entities` is the same in both languages**; **`menu` is not.** English pages separate the
   segments with `→`, the Arabic mirrors with `←` (right-to-left), with the segments in the same
   order. Quote the `menu` value verbatim when telling a support person where to click — it is the
-  system's own wording, odd casing and all (`Point of sale`, `Recuring Document`, `ai`).
+  system's own wording, odd casing and all (`Point of sale`, `Recuring Document`, `BUDGETS`).
 - **A page with no `entities` key is not a bug.** Concept pages, glossaries, FAQs and report
-  catalogues have no screen behind them and are deliberately left blank. Coverage is roughly 540 of
-  the 620 pages under `modules/` and `platform/`; everything outside those two folders has none yet.
+  catalogues have no screen behind them and are deliberately left blank. Coverage is roughly 660 of
+  the 850 pages under `modules/` and `platform/`, plus a few admin and integration pages.
+- **Every `entity-flows/` page carries `entities: [EntityFlow]`**, so keep
+  `--exclude-dir=entity-flows` when looking for a screen's guide, as above.
 
 **`namaerp-docs/docs/public/llms.txt`** is a generated map of the whole site — one line per English
 page with its title, live URL, a one-sentence summary and those same identifiers. Grep it when you
@@ -194,9 +205,31 @@ cat namaerp-dm/docs/public/dm-json/enums/DocumentFileStatus.json
 ls namaerp-docs/docs/entity-flows/*/EAGenJournalEntry.md
 ```
 
-Scoping rules of thumb: always pass `--include='*.md'` when grepping docs (there are 1700 PNGs),
+Scoping rules of thumb: always pass `--include='*.md'` when grepping docs (there are ~4,900 PNGs),
 always add `--exclude-dir=ar` unless you specifically want Arabic, and prefer `grep -l`
-(filenames) first, then read the two or three files that matter.
+(filenames) first, then read the two or three files that matter. The docs say a document is
+*processed*, not *posted* — search with their word.
+
+---
+
+## Skills — writing scripts and configurations
+
+Some tasks have a step-by-step skill under `namaerp-docs/docs/public/skills/`. When the task
+matches, read the skill file first and follow it:
+
+| Skill | Use it when |
+|---|---|
+| `groovy-writer.md` | writing or fixing a Groovy script for an entity flow (EA…, a validation or action in Groovy) |
+| `dashboard-designer.md` | building or fixing a BI dashboard, widget or cross filter inside Nama (`داشبورد`, KPI cards, a chart that shows wrong or unfiltered figures) |
+| `report-writer.md` | writing or fixing a Jasper report (`.jrxml`), its SQL and parameters, or a Report Wizard report |
+| `import-helper.md` | importing or bulk-updating records (Excel, JSON or `ImportRecord`), or working out why imported values did not stick |
+| `config-query-writer.md` | writing an Apply When / validation / notification query, a text criteria, or a field filter's Dynamic Filter |
+
+- **Groovy:** besides the skill, start from the nearest tested example —
+  `namaerp-docs/docs/entity-flows/groovy/` (one page per script; the scripts themselves are in
+  `namaerp-docs/docs/public/groovy-examples/`).
+- **`{field}` placeholders** in approval, validation and entity-flow queries:
+  `platform/governance/criteria-based-validation.md`, section "Reading values off the record".
 
 ---
 
@@ -205,6 +238,8 @@ always add `--exclude-dir=ar` unless you specifically want Arabic, and prefer `g
 Nama ERP always runs on **Microsoft SQL Server**. Every query you write — for a customer, a
 support investigation, or an example in an answer — must be **T-SQL**. Never write MySQL,
 PostgreSQL, or Oracle syntax unless the user explicitly asks for that dialect.
+Table and column conventions (committed vs draft, names, joins, where amounts live):
+`namaerp-docs/docs/platform/reports/querying-nama-tables.md`.
 
 ## Never hand a support person a write query
 
@@ -223,9 +258,14 @@ So:
 - **`SELECT` is always fine.** Read-only investigation queries, row counts, "which records look
   wrong" — write those freely, in T-SQL.
 - **Fix things through the application, not the database.** The answer to "how do I correct this
-  record" is the screen, the menu path, the reprocessing utility (`admin/` covers reprocessing
-  quantities, costs and ledger), the entity flow, or the correct document — not SQL. Look for the
-  supported route and give that.
+  record" is the screen, the menu path, the entity flow, or the correct document — not SQL. Look
+  for the supported route and give that.
+- **One document missing its ledger or stock effect** → the Business Requests screen
+  (`platform/background-processing/business-requests.md`: find its request, read why it failed,
+  fix the cause, then More → Reprocess, or Recommit). The `admin/reprocessing/` pages are
+  whole-database recovery — days of downtime, a backup first, no undo — and never the answer for
+  one document. Their SQL scripts are write statements under this rule: name the page and section,
+  do not paste the script unless the user explicitly asks.
 - **If there is genuinely no route but a data change**, say so plainly and tell them it needs to
   go to Nama development / a database administrator. Do not draft the statement "just so they have
   it".
@@ -333,7 +373,7 @@ URL usually means the AI module is not installed on that server, not that the pa
 ## When an MCP tool you need is missing — say so
 
 The tools a Nama MCP server exposes are exactly the lines on its **AI Tool Definition** record
-(`ai → Master Files → AI Tool Definition`, documented in
+(`Artificial Intelligence → Master Files → AI Tool Definition`, documented in
 `namaerp-docs/docs/modules/ai/ai-tool-definitions.md`). Administrators often add only some of them,
 so a connected server can lack the very tool the job calls for — the dashboard tools
 (`AITDashboardTools`) when building a dashboard, the report tools (`AITReportReadTools` /
@@ -373,7 +413,10 @@ Read the BI docs first — `namaerp-docs/docs/platform/bi/bi-module-guide.md`, t
     cross filters and parameters applied); use it when a chart is empty or wrong.
   - `<prefix>RunDashboard` — run the whole dashboard (or one tab) to check every widget at once.
   - Save with `<prefix>ImportRecord` (schema from `<prefix>GetImportSchema` for `DashBoard` /
-    `DashBoardWidget`) only once the preview figures are right.
+    `DashBoardWidget`) only once the preview figures are right. **Send `chartConfigJSON` as a JSON
+    string** (stringified). The BI reference writes it as a nested object, but that works only in
+    an import file; through ImportRecord a nested object is read as a reference and the widget
+    saves without its chart configuration.
 
   If `AITDashboardTools` is not on the server, follow the missing-tool rule above (say so, and
   offer to add it via the import tools if those are connected) rather than saving widgets blind.

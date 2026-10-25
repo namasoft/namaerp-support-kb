@@ -12,3 +12,4 @@ Thumbs.db
 
 # Local Claude Code state (keep CLAUDE.md and .claude/settings.json tracked)
 .claude/settings.local.json
+/.mcp.json
