@@ -24,5 +24,22 @@
       "Edit(./namaerp-dm/**)",
       "Write(./namaerp-dm/**)"
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -Command '$d = $env:CLAUDE_PROJECT_DIR; if (-not $d) { $d = $PWD }; & (Join-Path $d .claude/hooks/statusline.ps1)'"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -Command '$d = $env:CLAUDE_PROJECT_DIR; if (-not $d) { $d = $PWD }; & (Join-Path $d .claude/hooks/context-guard.ps1)'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

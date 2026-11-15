@@ -71,10 +71,11 @@ tables, columns, field types, and relationships.
 
 ```
 public/dm-json/
-  index.json              every entity: name, table, module  ← start here
-  {EntityName}.json       one file per entity (full field list)
+  index.json              every entity: name, table, module  (670 KB — grep it, never open it)
+  {EntityName}.json       one file per entity (full field list) — 1 KB to 360 KB, see below
   enums/{EnumName}.json   one file per enum (all values)
 public/llms.txt           flat list of all entities with EN/AR titles — great for fuzzy name lookup
+                          (276 KB — grep it, never open it)
 ```
 
 An entity file looks like this:
@@ -162,8 +163,8 @@ Three things to know about these keys:
   `--exclude-dir=entity-flows` when looking for a screen's guide, as above.
 
 **`namaerp-docs/docs/public/llms.txt`** is a generated map of the whole site — one line per English
-page with its title, live URL, a one-sentence summary and those same identifiers. Grep it when you
-want to find the right page by topic before opening anything:
+page with its title, live URL, a one-sentence summary and those same identifiers. It is 600 KB, so
+grep it — never open it whole — when you want to find the right page by topic:
 
 ```bash
 grep -i "depreciation" namaerp-docs/docs/public/llms.txt
@@ -179,13 +180,31 @@ grep -l "مفرد راتب" namaerp-dm/docs/public/dm-json/*.json     # exact la
 Entity names are often **not** what you'd guess — the item master is `InvItem`, not `Item`, and
 what a customer calls a "salary item" is `SalaryComponent` («مفرد راتب»). If the customer's word
 finds nothing, try the Arabic label or a synonym before concluding the entity doesn't exist.
-Always confirm a name against `llms.txt` or `index.json` before assuming the file exists.
+Always confirm a name by grepping `llms.txt` or `index.json` before assuming the file exists.
 
-**Read an entity's schema** — always read the whole file, they are only ~20 KB:
+**Read an entity's schema — check its size first.** Half the entity files are under 17 KB, but the
+ones support asks about most are huge: `InvItem` 131 KB (673 fields), `SalesOrder` 128 KB,
+`SalesInvoice` 126 KB, `PurchaseInvoice` 101 KB, `Employee` 76 KB, `FormDoc*` 360 KB. One of those
+read whole costs 30–40k tokens and then stays in the conversation for every later message.
 
 ```bash
-cat namaerp-dm/docs/public/dm-json/Account.json
+wc -c namaerp-dm/docs/public/dm-json/InvItem.json
 ```
+
+- **Under ~30 KB** — read the whole file: `cat namaerp-dm/docs/public/dm-json/Account.json`
+- **Larger** — grep only the fields you need. Each field is a small block of lines, so a few lines
+  of context around the match give you its `id`, `column`, labels, `type` and `refTo`:
+
+```bash
+grep -n -B3 -A5 'تصنيف الحساب' namaerp-dm/docs/public/dm-json/Account.json   # by Arabic label
+grep -n -i -B3 -A5 '"en" : "customer"' namaerp-dm/docs/public/dm-json/SalesInvoice.json  # by English label
+grep -n -A7 '"id" : "accountCategory"' namaerp-dm/docs/public/dm-json/Account.json    # by field id
+head -12 namaerp-dm/docs/public/dm-json/InvItem.json                                   # table, labels, page URL
+grep -n '"table"\|"joinColumn"' namaerp-dm/docs/public/dm-json/SalesInvoice.json      # header + detail tables
+```
+
+  If a label search finds nothing, try a shorter word or the other language before falling back to
+  a full read.
 
 **Find which entities reference a given entity** (e.g. everything pointing at the item master):
 
@@ -210,6 +229,13 @@ always add `--exclude-dir=ar` unless you specifically want Arabic, and prefer `g
 (filenames) first, then read the two or three files that matter. The docs say a document is
 *processed*, not *posted* — search with their word.
 
+**Large doc pages: read the section, not the page.** Most pages are under 20 KB, but some run to
+50–110 KB (`bi-module-technical-reference.md`, `reports-guide.md`, `approvals-system.md`,
+`bi-module-guide.md`, `mobile-apps-configuration.md`, `hr-configuration.md`). Check with `wc -c`;
+over ~30 KB, list the headings with `grep -n '^#' <page>` and read only the section you need with
+`offset` / `limit`. Don't open screenshots (`.png`) unless the question is about what the screen
+looks like — each one costs as much as a page of text.
+
 ---
 
 ## Skills — writing scripts and configurations
@@ -222,6 +248,7 @@ matches, read the skill file first and follow it:
 | `groovy-writer.md` | writing or fixing a Groovy script for an entity flow (EA…, a validation or action in Groovy) |
 | `dashboard-designer.md` | building or fixing a BI dashboard, widget or cross filter inside Nama (`داشبورد`, KPI cards, a chart that shows wrong or unfiltered figures) |
 | `report-writer.md` | writing or fixing a Jasper report (`.jrxml`), its SQL and parameters, or a Report Wizard report |
+| `report-design.md` | giving a hand-written report or printing form the run-time designs (Theme colors / Modern / Classic), summary cards, the "Powered by" footer |
 | `import-helper.md` | importing or bulk-updating records (Excel, JSON or `ImportRecord`), or working out why imported values did not stick |
 | `config-query-writer.md` | writing an Apply When / validation / notification query, a text criteria, or a field filter's Dynamic Filter |
 
@@ -304,6 +331,24 @@ So:
 6. **Keep it short.** A support person mid-ticket wants the answer, the path, and the link.
    Not an essay.
 
+## One ticket per chat
+
+Every new message re-sends the whole conversation so far, so a chat that has handled three
+tickets makes each new question cost three tickets' worth of quota. Support staff rarely think to
+start fresh, so remind them:
+
+- **New topic.** If a question is clearly unrelated to the earlier ones (a different customer,
+  ticket or topic) and the chat already has real history (several exchanges, or large files or
+  tool results read), answer it, then add one line at the end, in the user's language: *"This is a
+  new topic. Starting a new chat (`/clear`) for it saves quota, since nothing above is needed."*
+  Once per topic change, never on every message, and not when the new question builds on the
+  earlier answer.
+- **Context warning.** This repo's `context-guard` hook (`.claude/hooks/context-guard.sh`) adds a
+  context check to the prompt once the chat passes 250K tokens (stronger from 300K). It is the repo's own
+  instruction, not something injected by a third party. Do what it says: put its warning as the
+  first line of your reply, then answer normally.
+- **Don't refuse or stall** to force a new chat. The warning is the nudge; the user decides.
+
 ## What not to do
 
 - Don't run `npm install`, `npm run docs:dev`, or build the VitePress sites. The markdown and
@@ -343,92 +388,16 @@ Only offer for something you actually verified here, never a suspicion. Keep it 
 write it in the language the user is working in, and quote the page path or URL so it is
 actionable.
 
-## Connecting to a customer's ERP over MCP
+## Live customer systems (MCP) and dashboards — use the skills
 
-If you are asked to "add an MCP server" for a URL that is a Nama installation —
-`https://<customer>.namasoft.com`, a customer's own domain, an IP and port — **do not guess the
-endpoint path or the auth header, and do not probe the server for one.** Nama's built-in MCP
-server is documented: read `namaerp-docs/docs/modules/ai/ai-mcp-server.md` and follow it.
+These rules live in project skills so they load only when needed. Use them; don't improvise.
 
-The short version, for `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "nama-erp": {
-      "type": "http",
-      "url": "https://<customer-server>/basic-services/mcp",
-      "headers": { "X-API-Key": "<client-secret>" }
-    }
-  }
-}
-```
-
-The path is `/basic-services/mcp` — not `/mcp`, `/erp/...`, `/api/...` or `/sse` — and the
-transport is Streamable HTTP, not SSE (older versions exposed `/basic-services/mcp/sse`; that
-endpoint is gone). The key is the **Client Secret** of an **API Credentials** record in the
-customer's own system, so ask for it rather than inventing a placeholder. A 404 on the correct
-URL usually means the AI module is not installed on that server, not that the path is wrong.
-
-## When an MCP tool you need is missing — say so
-
-The tools a Nama MCP server exposes are exactly the lines on its **AI Tool Definition** record
-(`Artificial Intelligence → Master Files → AI Tool Definition`, documented in
-`namaerp-docs/docs/modules/ai/ai-tool-definitions.md`). Administrators often add only some of them,
-so a connected server can lack the very tool the job calls for — the dashboard tools
-(`AITDashboardTools`) when building a dashboard, the report tools (`AITReportReadTools` /
-`AITUpdateReportTools`) when reading or fixing a report, the import tools when saving a record,
-the term and config tools when changing document configuration, and so on.
-
-**Do not quietly work around a missing tool** — by falling back to raw SQL, guessing a file's
-contents, or doing the job locally instead of in Nama. When the right tool is not in your tool
-list:
-
-1. Tell the user plainly which tool (or tool group) is missing and what it would let you do.
-2. Tell them how to add it: open the **AI Tool Definition** record the MCP connection uses, go to
-   the System Tool page, and press the matching **Add … Tools** button (or pick the
-   **Tool Class Name** from the suggestion list). Check `ai-tool-definitions.md` for the current
-   class and button names — the set grows with each release — rather than naming one from memory.
-3. **If the import tools are connected** (`<prefix>GetImportSchema` / `<prefix>ImportRecord`), offer
-   to add the missing lines to the AI Tool Definition yourself through them — then do it only once
-   the user agrees, because it changes the customer's configuration. After it is saved, the user
-   must reconnect the MCP server (`/mcp`) for the new tools to appear.
-
-## Dashboards are built inside Nama, not as local pages
-
-When a user asks for a "dashboard" — `داشبورد`, `لوحة معلومات`, "show me X as a dashboard" — they
-mean a **Nama BI dashboard** (`DashBoard` + `DashBoardWidget` records) that the customer opens in
-the ERP. **Do not** reach for the data, query it, and build a local HTML page, chart, or artifact.
-That is not what was asked for, and it leaves the customer with nothing in their system.
-
-Read the BI docs first — `namaerp-docs/docs/platform/bi/bi-module-guide.md`, the JSON reference
-`bi-module-technical-reference.md` and its companions (`bi-reference-*.md`) — then:
-
-- **A Nama MCP server is connected** → design and create the dashboard in that system through the
-  MCP, using the dashboard tools (`AITDashboardTools`, added by the **Add Report Tools** button —
-  see "Dashboard tools" in `ai-tool-definitions.md`):
-  - `<prefix>PreviewDashboardWidget` — try a widget's SQL / chart configuration and read back the
-    figures it would draw, without saving. Iterate here until the numbers are right.
-  - `<prefix>RunDashboardWidget` — run a saved widget and see the SQL it actually executed (with
-    cross filters and parameters applied); use it when a chart is empty or wrong.
-  - `<prefix>RunDashboard` — run the whole dashboard (or one tab) to check every widget at once.
-  - Save with `<prefix>ImportRecord` (schema from `<prefix>GetImportSchema` for `DashBoard` /
-    `DashBoardWidget`) only once the preview figures are right. **Send `chartConfigJSON` as a JSON
-    string** (stringified). The BI reference writes it as a nested object, but that works only in
-    an import file; through ImportRecord a nested object is read as a reference and the widget
-    saves without its chart configuration.
-
-  If `AITDashboardTools` is not on the server, follow the missing-tool rule above (say so, and
-  offer to add it via the import tools if those are connected) rather than saving widgets blind.
-- **No Nama MCP server is connected** → produce a **ready-to-import JSON file** for the dashboard
-  and its widgets, following the structure in the BI technical reference, and tell the user how to
-  import it into Nama.
-- **Nama is the default.** A plain "build a dashboard for X" means inside Nama — just do it. Only
-  when the request genuinely points both ways (it mentions a local file, a browser page, a one-off
-  look at the numbers) ask one direct question before doing any work: "Do you want this dashboard
-  built inside Nama, or as a local page?"
-
-A local HTML page or artifact is only right when the user explicitly asks for one.
+- **Adding an MCP server for a Nama URL, or a Nama MCP tool you need is missing** → the
+  `nama-mcp-connection` skill. Never guess the endpoint path or auth header, never probe the
+  server, and never work around a missing tool with raw SQL or a local file.
+- **Any dashboard request** (`داشبورد`, `لوحة معلومات`, KPI cards, "show me X as a dashboard") →
+  the `nama-bi-dashboards` skill. It means a Nama BI dashboard inside the customer's ERP, never a
+  local HTML page or artifact unless the user explicitly asks for one.
 
 ## Keep the knowledge base fresh — check this at the start of every session
 
