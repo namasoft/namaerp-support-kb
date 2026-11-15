@@ -200,7 +200,7 @@ grep -n -B3 -A5 'تصنيف الحساب' namaerp-dm/docs/public/dm-json/Account
 grep -n -i -B3 -A5 '"en" : "customer"' namaerp-dm/docs/public/dm-json/SalesInvoice.json  # by English label
 grep -n -A7 '"id" : "accountCategory"' namaerp-dm/docs/public/dm-json/Account.json    # by field id
 head -12 namaerp-dm/docs/public/dm-json/InvItem.json                                   # table, labels, page URL
-grep -n '"table"\|"joinColumn"' namaerp-dm/docs/public/dm-json/SalesInvoice.json      # header + detail tables
+grep -n -E '"(table|joinColumn)"' namaerp-dm/docs/public/dm-json/SalesInvoice.json    # header + detail tables
 ```
 
   If a label search finds nothing, try a shorter word or the other language before falling back to
